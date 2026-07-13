@@ -1,0 +1,195 @@
+# Pipeline base de entrenamiento y validación en PyTorch
+
+## Descripción
+
+Este repositorio corresponde al primer checkpoint del Proyecto Final. Su objetivo es implementar un pipeline reproducible de entrenamiento y validación para un clasificador de Deep Learning desarrollado con PyTorch.
+
+Para esta prueba técnica se utiliza el dataset **Iris**, un conjunto clásico de clasificación multiclase compuesto por 150 observaciones, cuatro variables numéricas y tres clases de flores.
+
+El foco de la entrega no está puesto en la complejidad del modelo, sino en la correcta construcción del ciclo de vida inicial del experimento:
+
+- configuración del entorno;
+- selección automática de dispositivo;
+- reproducibilidad;
+- preparación y división de datos;
+- arquitectura base;
+- entrenamiento;
+- validación;
+- registro de métricas;
+- guardado del mejor modelo;
+- generación de curvas de desempeño.
+
+## Estructura del repositorio
+
+```text
+pipeline_deep_learning/
+├── data/
+│   └── README.md
+├── outputs/
+│   └── .gitkeep
+├── src/
+│   └── train.py
+├── .gitignore
+├── README.md
+└── requirements.txt
+```
+
+## Arquitectura utilizada
+
+Se implementó una red neuronal multicapa pequeña mediante `nn.Module` y `nn.Sequential`:
+
+```text
+Entrada de 4 variables
+        ↓
+Capa lineal: 4 → 16
+        ↓
+Activación ReLU
+        ↓
+Capa lineal: 16 → 3
+        ↓
+Logits de salida
+```
+
+No se incorpora una función `Softmax` explícita en la última capa porque `nn.CrossEntropyLoss` trabaja directamente con logits y aplica internamente la transformación necesaria.
+
+## Configuración del entorno
+
+El script detecta automáticamente el dispositivo disponible siguiendo este orden:
+
+1. GPU con CUDA.
+2. GPU de Apple mediante MPS.
+3. CPU.
+
+También se fijan semillas de aleatoriedad en Python, NumPy y PyTorch para mejorar la reproducibilidad.
+
+## Hiperparámetros
+
+- Épocas: `100`
+- Batch size: `16`
+- Learning rate: `0.01`
+- Optimizador: `Adam`
+- Función de pérdida: `CrossEntropyLoss`
+- Tamaño de la capa oculta: `16`
+- Proporción de validación: `20 %`
+- Semilla: `42`
+
+El learning rate de `0.01` fue elegido porque permite una convergencia rápida en un dataset pequeño y de baja complejidad como Iris. En proyectos de mayor escala debería ajustarse mediante validación o búsqueda de hiperparámetros.
+
+## Pipeline de entrenamiento
+
+En cada batch se ejecutan las siguientes etapas:
+
+1. Los datos se trasladan al dispositivo seleccionado.
+2. Se limpian los gradientes con `optimizer.zero_grad()`.
+3. Se realiza el forward pass.
+4. Se calcula la pérdida.
+5. Se ejecuta `loss.backward()` para obtener los gradientes mediante autograd.
+6. Se actualizan los parámetros con `optimizer.step()`.
+
+## Pipeline de validación
+
+La validación se realiza al final de cada época sobre datos no utilizados para actualizar los pesos.
+
+Se emplean:
+
+```python
+model.eval()
+```
+
+y:
+
+```python
+@torch.no_grad()
+```
+
+Esto desactiva el comportamiento de entrenamiento y evita el cálculo innecesario de gradientes.
+
+## Métricas registradas
+
+Por cada época se almacenan:
+
+- pérdida de entrenamiento;
+- pérdida de validación;
+- accuracy de entrenamiento;
+- accuracy de validación.
+
+El modelo con menor pérdida de validación se guarda en:
+
+```text
+outputs/best_model.pt
+```
+
+También se generan:
+
+```text
+outputs/loss_curve.png
+outputs/accuracy_curve.png
+```
+
+## Interpretación esperada de la curva de pérdida
+
+Durante las primeras épocas se espera observar una reducción marcada de la pérdida de entrenamiento y validación. Posteriormente, ambas curvas deberían estabilizarse.
+
+Si la pérdida de entrenamiento continúa bajando mientras la pérdida de validación comienza a aumentar, podría existir overfitting. En este experimento, debido al tamaño reducido de la red y a la simplicidad del dataset, se espera que la pérdida de validación disminuya y que el accuracy alcance valores altos sin una separación excesiva entre entrenamiento y validación.
+
+La interpretación definitiva debe completarse luego de ejecutar el experimento y observar las curvas generadas.
+
+## Instalación
+
+Se recomienda crear un entorno virtual:
+
+```bash
+python -m venv .venv
+```
+
+Activación en Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+Activación en macOS o Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Instalar dependencias:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Ejecución
+
+Desde la raíz del repositorio:
+
+```bash
+python src/train.py
+```
+
+## Resultados esperados
+
+La consola mostrará cada diez épocas:
+
+- pérdida de entrenamiento;
+- accuracy de entrenamiento;
+- pérdida de validación;
+- accuracy de validación.
+
+Al finalizar, se guardarán el mejor modelo y las curvas del experimento dentro de la carpeta `outputs/`.
+
+## Reproducibilidad
+
+La fijación de semillas reduce la variabilidad entre ejecuciones. Sin embargo, pueden persistir pequeñas diferencias según el hardware, la versión de PyTorch o determinadas operaciones no deterministas del dispositivo.
+
+## Posibles mejoras futuras
+
+- early stopping;
+- matriz de confusión;
+- F1-Score;
+- búsqueda de hiperparámetros;
+- TensorBoard o MLflow;
+- separación adicional de un conjunto de test;
+- configuración mediante archivo YAML;
+- empaquetado del pipeline en funciones y clases reutilizables.
